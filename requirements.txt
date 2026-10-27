@@ -1,0 +1,19 @@
+# Web service
+fastapi==0.136.1
+uvicorn==0.46.0
+pydantic==2.13.3
+
+# LLM client (Groq is called through its OpenAI-compatible API)
+openai==2.32.0
+
+# Config and dates
+python-dotenv
+python-dateutil
+
+# Retrieval
+numpy==2.4.4
+sentence-transformers==6.2.0
+
+# Tests
+pytest
+httpx
