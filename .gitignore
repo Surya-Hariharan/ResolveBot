@@ -17,3 +17,9 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# Test and run artifacts
+.pytest_cache/
+*.db
+*.sqlite
+reports/*.log
