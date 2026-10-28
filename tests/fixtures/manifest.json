@@ -1,0 +1,7 @@
+[
+  {"doc_id": "returns_policy", "file": "policies.md", "title": "Test Returns Policy", "doc_type": "policy", "effective_date": "2025-04-01", "status": "current"},
+  {"doc_id": "returns_policy_old", "file": "policies.md", "title": "Test Returns Policy (old)", "doc_type": "policy", "effective_date": "2024-01-01", "status": "superseded"},
+  {"doc_id": "shipping_policy", "file": "policies.md", "title": "Test Shipping Policy", "doc_type": "policy", "effective_date": "2025-09-01", "status": "current"},
+  {"doc_id": "shipping_update", "file": "policies.md", "title": "Test Shipping Update", "doc_type": "policy", "effective_date": "2026-09-01", "status": "current"},
+  {"doc_id": "faq_general", "file": "policies.md", "title": "Test FAQ", "doc_type": "faq", "effective_date": "2025-01-15", "status": "current"}
+]
