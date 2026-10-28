@@ -4,17 +4,23 @@ Order of checks: who is calling (401), is the body valid (400), does the
 session belong to them (403). Everything else answers 200.
 """
 import json
+import logging
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 
 from app import database
-from app.agent.orchestrator import handle_message
+from app.agent import llm
+from app.agent.orchestrator import Reply, handle_message
 from app.config import load_settings
 from app.models import ChatResponse
+from app.retrieval.search import PolicySearch
 from app.sessions import SessionOwnerError, SessionStore
+
+logger = logging.getLogger("resolvebot")
 
 
 def error_response(status_code, message):
@@ -38,10 +44,33 @@ def read_chat_body(raw_body):
     return session_id, message
 
 
-def create_app(settings=None):
+def load_policy_search(settings):
+    """Parse the policy files. The service still starts if they are missing;
+    search_policy then reports that the documents are unavailable.
+    """
+    try:
+        return PolicySearch(settings)
+    except (OSError, ValueError, KeyError) as problem:
+        logger.warning("Policy documents not loaded: %s", type(problem).__name__)
+        return None
+
+
+def create_app(settings=None, llm_chat=None, policy_search=None):
+    """llm_chat and policy_search can be replaced in tests."""
     settings = settings or load_settings()
     sessions = SessionStore()
-    app = FastAPI(title="ResolveBot")
+    if policy_search is None:
+        policy_search = load_policy_search(settings)
+    chat_function = llm_chat or llm.chat
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        # Load the embedding model in the background so the server is up immediately
+        if policy_search is not None:
+            policy_search.start_warm_up_in_background()
+        yield
+
+    app = FastAPI(title="ResolveBot", lifespan=lifespan)
 
     @app.post("/chat", response_model=ChatResponse)
     async def chat(request: Request):
@@ -60,16 +89,20 @@ def create_app(settings=None):
         except SessionOwnerError:
             return error_response(403, "This session belongs to another customer.")
 
-        answer, route, citations, tool_calls, pending = await run_in_threadpool(
-            handle_message, settings, customer_id, session, message
-        )
+        try:
+            reply = await run_in_threadpool(
+                handle_message, settings, customer_id, session, message, policy_search, chat_function
+            )
+        except Exception as problem:  # last resort: the assignment allows only 400/401/403 as errors
+            logger.error("Unexpected error while answering: %s", type(problem).__name__)
+            reply = Reply("Sorry, something went wrong on our side. Nothing was changed. Please try again.", "no_answer")
         return ChatResponse(
             request_id=str(uuid.uuid4()),
-            answer=answer,
-            route=route,
-            citations=citations,
-            tool_calls=tool_calls,
-            pending_confirmation=pending,
+            answer=reply.answer,
+            route=reply.route,
+            citations=reply.citations,
+            tool_calls=reply.tool_calls,
+            pending_confirmation=reply.pending_confirmation,
         )
 
     return app
